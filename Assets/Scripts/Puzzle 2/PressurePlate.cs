@@ -13,11 +13,15 @@ public class PressurePlate : MonoBehaviour
 
     private void OnTriggerEnter(Collider other)
     {
+        if(other.CompareTag("Player"))
+        {
+            Debug.Log("Pressure plate " + plateNumber + " activated by: " + other.name);
+        }
+
         if (isActivated)
             return;
 
-        PlayerController player =
-            other.GetComponentInParent<PlayerController>();
+        PlayerController player = other.GetComponentInParent<PlayerController>();
 
         if (player != null)
         {
