@@ -5,85 +5,123 @@ using UnityEngine;
 public class PlayerController : MonoBehaviour
 {
     [Header("Movement")]
-    public float moveSpeed = 5f;
-    public float jumpHeight = 2f;
-    public float gravity = -20f;
+    [SerializeField] private float moveSpeed = 5f;
+    [SerializeField] private float rotationSpeed = 10f;
+    [SerializeField] private float jumpHeight = 2f;
+    [SerializeField] private float gravity = -20f;
 
     [Header("Ground Check")]
-    public Transform groundCheck;
-    public float groundDistance = 0.2f;
-    public LayerMask groundMask;
+    [SerializeField] private Transform groundCheck;
+    [SerializeField] private float groundDistance = 0.2f;
+    [SerializeField] private LayerMask groundMask;
 
     private CharacterController controller;
     private Vector3 velocity;
-    private float fixedZ;
-
     private bool isGrounded;
 
-    void Start()
+    private void Awake()
     {
         controller = GetComponent<CharacterController>();
-
-        // Lock player to the side-scrolling plane
-        fixedZ = transform.position.z;
     }
 
-    void Update()
+    private void Update()
     {
-        // Ground detection
-        isGrounded = controller.isGrounded;
+        CheckGround();
+        HandleMovement();
+        HandleJump();
+        ApplyGravity();
+    }
 
-        if (isGrounded && velocity.y < 0)
+    private void CheckGround()
+    {
+        if (groundCheck != null)
+        {
+            isGrounded = Physics.CheckSphere( groundCheck.position, groundDistance, groundMask);
+        }
+        else
+        {
+            isGrounded = controller.isGrounded;
+        }
+
+        if (isGrounded && velocity.y < 0f)
         {
             velocity.y = -2f;
         }
+    }
 
-        // Left and right movement
-        float horizontal = Input.GetAxisRaw("Horizontal");
+    private void HandleMovement()
+    {
+        float xInput = Input.GetAxisRaw("Horizontal");
+        float zInput = Input.GetAxisRaw("Vertical");
 
-        Vector3 move = new Vector3(horizontal, 0f, 0f);
+        Vector3 inputVector = new Vector3(xInput, 0f, zInput);
+        inputVector = Vector3.ClampMagnitude(inputVector, 1f);
 
-        controller.Move(move * moveSpeed * Time.deltaTime);
+        Vector3 moveDirection = inputVector;
 
-        // Player rotation
-        if (horizontal > 0)
+        if (Camera.main != null)
         {
-            transform.rotation = Quaternion.Euler(0, 0, 0);
-        }
-        else if (horizontal < 0)
-        {
-            transform.rotation = Quaternion.Euler(0, 180, 0);
+            Vector3 forward = Camera.main.transform.forward;
+            Vector3 right = Camera.main.transform.right;
+
+            // Remove vertical camera direction
+            forward.y = 0f;
+            right.y = 0f;
+
+            forward.Normalize();
+            right.Normalize();
+
+            moveDirection = forward * inputVector.z + right * inputVector.x;
         }
 
-        // Jump
+        // Rotate player towards movement direction
+        if (moveDirection.sqrMagnitude > 0.01f)
+        {
+            Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
+
+            transform.rotation = Quaternion.Slerp( transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+        }
+
+        Vector3 horizontalMovement = moveDirection * moveSpeed;
+
+        controller.Move((horizontalMovement + velocity) * Time.deltaTime);
+    }
+
+    private void HandleJump()
+    {
         if (Input.GetButtonDown("Jump") && isGrounded)
         {
             velocity.y = Mathf.Sqrt(jumpHeight * -2f * gravity);
         }
+    }
 
-        // Apply gravity
+    private void ApplyGravity()
+    {
         velocity.y += gravity * Time.deltaTime;
-
-        controller.Move(velocity * Time.deltaTime);
-
-        // Lock Z position
-        Vector3 position = transform.position;
-        position.z = fixedZ;
-        transform.position = position;
     }
 
-    private void OnControllerColliderHit(ControllerColliderHit hit) 
+    private void OnControllerColliderHit(ControllerColliderHit hit)
     {
-        CollapsingPlatform platform = hit.collider.GetComponent<CollapsingPlatform>();
+        CollapsingPlatform platform =
+            hit.collider.GetComponentInParent<CollapsingPlatform>();
 
-        if(platform != null)
-            platform.TriggerPlatform();    
+        if (platform != null)
+        {
+            platform.TriggerPlatform();
+        }
     }
 
-    private void OnDrawGizmos()
+    private void OnDrawGizmosSelected()
     {
-        Gizmos.color = Color.red;
-        Gizmos.DrawWireSphere(groundCheck.position,groundDistance);
+        if (groundCheck != null)
+        {
+            Gizmos.color = Color.red;
+
+            Gizmos.DrawWireSphere(
+                groundCheck.position,
+                groundDistance
+            );
+        }
     }
 
     public void ResetVelocity()
