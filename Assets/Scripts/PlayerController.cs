@@ -16,12 +16,17 @@ public class PlayerController : MonoBehaviour
     [SerializeField] private LayerMask groundMask;
 
     private CharacterController controller;
+    private Animator anim;
+
     private Vector3 velocity;
+    private Vector3 moveDirection;
+    private float moveAmount;
     private bool isGrounded;
 
     private void Awake()
     {
         controller = GetComponent<CharacterController>();
+        anim = GetComponentInChildren<Animator>();
     }
 
     private void Update()
@@ -30,13 +35,19 @@ public class PlayerController : MonoBehaviour
         HandleMovement();
         HandleJump();
         ApplyGravity();
+        MovePlayer();
+        HandleAnimation();
     }
 
     private void CheckGround()
     {
         if (groundCheck != null)
         {
-            isGrounded = Physics.CheckSphere( groundCheck.position, groundDistance, groundMask);
+            isGrounded = Physics.CheckSphere(
+                groundCheck.position,
+                groundDistance,
+                groundMask
+            );
         }
         else
         {
@@ -57,34 +68,39 @@ public class PlayerController : MonoBehaviour
         Vector3 inputVector = new Vector3(xInput, 0f, zInput);
         inputVector = Vector3.ClampMagnitude(inputVector, 1f);
 
-        Vector3 moveDirection = inputVector;
+        moveAmount = inputVector.magnitude;
+
+        moveDirection = inputVector;
 
         if (Camera.main != null)
         {
             Vector3 forward = Camera.main.transform.forward;
             Vector3 right = Camera.main.transform.right;
 
-            // Remove vertical camera direction
             forward.y = 0f;
             right.y = 0f;
 
             forward.Normalize();
             right.Normalize();
 
-            moveDirection = forward * inputVector.z + right * inputVector.x;
+            moveDirection =
+                forward * inputVector.z +
+                right * inputVector.x;
         }
 
-        // Rotate player towards movement direction
+        moveDirection = Vector3.ClampMagnitude(moveDirection, 1f);
+
         if (moveDirection.sqrMagnitude > 0.01f)
         {
-            Quaternion targetRotation = Quaternion.LookRotation(moveDirection);
+            Quaternion targetRotation =
+                Quaternion.LookRotation(moveDirection);
 
-            transform.rotation = Quaternion.Slerp( transform.rotation, targetRotation, rotationSpeed * Time.deltaTime);
+            transform.rotation = Quaternion.Slerp(
+                transform.rotation,
+                targetRotation,
+                rotationSpeed * Time.deltaTime
+            );
         }
-
-        Vector3 horizontalMovement = moveDirection * moveSpeed;
-
-        controller.Move((horizontalMovement + velocity) * Time.deltaTime);
     }
 
     private void HandleJump()
@@ -98,6 +114,26 @@ public class PlayerController : MonoBehaviour
     private void ApplyGravity()
     {
         velocity.y += gravity * Time.deltaTime;
+    }
+
+    private void MovePlayer()
+    {
+        Vector3 horizontalMovement = moveDirection * moveSpeed;
+
+        Vector3 finalMovement = horizontalMovement + velocity;
+
+        controller.Move(finalMovement * Time.deltaTime);
+    }
+
+    private void HandleAnimation()
+    {
+        if (anim == null)
+            return;
+
+        float animationDamp = 0.15f;
+
+        anim.SetFloat("Speed", moveAmount,animationDamp,Time.deltaTime);
+        //anim.SetBool("IsGrounded", isGrounded);
     }
 
     private void OnControllerColliderHit(ControllerColliderHit hit)

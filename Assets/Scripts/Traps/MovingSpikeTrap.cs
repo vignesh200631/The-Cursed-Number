@@ -38,4 +38,10 @@ public class MovingSpikeTrap : MonoBehaviour
             player.Die();
         }
     }
+
+    private void OnDrawGizmos() 
+    {
+        Gizmos.color = Color.red;
+        Gizmos.DrawLine(pointA.position, pointB.position);
+    }
 }
